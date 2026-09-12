@@ -1,0 +1,188 @@
+package me.axieum.mcmod.authme.api.gui.screen;
+
+import com.mojang.blaze3d.platform.InputConstants;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.ImageButton;
+import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.WidgetSprites;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.ConfirmScreen;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+
+import me.axieum.mcmod.authme.api.AuthMe;
+import me.axieum.mcmod.authme.config.Config;
+import me.axieum.mcmod.authme.api.util.SessionUtils;
+
+import static me.axieum.mcmod.authme.api.AuthMe.LOGGER;
+
+/**
+ * The authentication method selection screen.
+ */
+public class AuthMethodScreen extends Screen
+{
+    /** The parent (or last) screen that opened this screen. */
+    private final Screen parentScreen;
+    /** The 'Microsoft' authentication method button textures. */
+    public static final WidgetSprites MICROSOFT_BUTTON_TEXTURES = new WidgetSprites(
+        Identifier.fromNamespaceAndPath("authme", "widget/microsoft_button"),
+        Identifier.fromNamespaceAndPath("authme", "widget/microsoft_button_disabled"),
+        Identifier.fromNamespaceAndPath("authme", "widget/microsoft_button_focused")
+    );
+    /** The 'Mojang (or legacy)' authentication method button textures. */
+    public static final WidgetSprites MOJANG_BUTTON_TEXTURES = new WidgetSprites(
+        Identifier.fromNamespaceAndPath("authme", "widget/mojang_button"),
+        Identifier.fromNamespaceAndPath("authme", "widget/mojang_button_disabled"),
+        Identifier.fromNamespaceAndPath("authme", "widget/mojang_button_focused")
+    );
+    /** The 'Offline' authentication method button textures. */
+    public static final WidgetSprites OFFLINE_BUTTON_TEXTURES = new WidgetSprites(
+        Identifier.fromNamespaceAndPath("authme", "widget/offline_button"),
+        Identifier.fromNamespaceAndPath("authme", "widget/offline_button_disabled"),
+        Identifier.fromNamespaceAndPath("authme", "widget/offline_button_focused")
+    );
+    /** The 'User Selection' textures. */
+    public static final WidgetSprites USER_SELECTION_TEXTURES = new WidgetSprites(
+            Identifier.fromNamespaceAndPath("authme", "widget/user_selection"),
+            Identifier.fromNamespaceAndPath("authme", "widget/user_selection"),
+            Identifier.fromNamespaceAndPath("authme", "widget/user_selection")
+    );
+    /** The 'Add by token' button textures. */
+    public static final WidgetSprites TOKEN_BUTTON_TEXTURES = new WidgetSprites(
+        Identifier.fromNamespaceAndPath("authme", "widget/blank_button"),
+        Identifier.fromNamespaceAndPath("authme", "widget/blank_button_disabled"),
+        Identifier.fromNamespaceAndPath("authme", "widget/blank_button_focused")
+    );
+
+    /**
+     * Constructs a new authentication method choice screen.
+     *
+     * @param parentScreen parent (or last) screen that opened this screen
+     */
+    public AuthMethodScreen(Screen parentScreen)
+    {
+        super(Component.translatable("gui.authme.method.title"));
+        this.parentScreen = parentScreen;
+    }
+
+    @Override
+    protected void init()
+    {
+        super.init();
+        assert minecraft != null;
+
+        // Add a title
+        StringWidget titleWidget = addRenderableWidget(new StringWidget(title.copy().withColor(0xffffff), font));
+        AuthScreen.centerPosition(titleWidget, this, 0, 0);
+
+        // Add a greeting message
+        StringWidget greetingWidget = addRenderableWidget(new StringWidget(
+            Component.translatable(
+                "gui.authme.method.greeting",
+                Component.literal(SessionUtils.getUser().getName()).withStyle(ChatFormatting.YELLOW)
+            ).withColor(0xa0a0a0),
+            font
+        ));
+        AuthScreen.centerPosition(greetingWidget, this, 0, -20);
+
+        // TODO: Center all buttons
+
+        // Add a button for the 'Microsoft' authentication method
+        ImageButton msButton = new ImageButton(
+            width / 2 - 58, height / 2 - 5, 20, 20,
+            MICROSOFT_BUTTON_TEXTURES,
+            button -> {
+                // If 'Left Control' is being held, enforce user interaction
+                final boolean selectAccount = InputConstants.isKeyDown(
+                    minecraft.getWindow(), InputConstants.KEY_LCONTROL
+                );
+                if (Config.LoginMethods.Microsoft.isDefaults()) {
+                    minecraft.setScreenAndShow(new MicrosoftAuthScreen(this, parentScreen, selectAccount));
+                } else {
+                    LOGGER.warn("Non-default Microsoft authentication URLs are in use!");
+                    ConfirmScreen confirmScreen = new ConfirmScreen(
+                        a -> minecraft.setScreenAndShow(
+                            a ? new MicrosoftAuthScreen(this, parentScreen, selectAccount) : this
+                        ),
+                        Component.translatable("gui.authme.microsoft.warning.title"),
+                        Component.translatable("gui.authme.microsoft.warning.body"),
+                        Component.translatable("gui.authme.microsoft.warning.accept"),
+                        Component.translatable("gui.authme.microsoft.warning.cancel")
+                    );
+                    minecraft.setScreenAndShow(confirmScreen);
+                    confirmScreen.setDelay(40);
+                }
+            },
+            Component.translatable("gui.authme.method.button.microsoft")
+        );
+        msButton.setTooltip(Tooltip.create(
+            Component.translatable("gui.authme.method.button.microsoft")
+                .append("\n")
+                .append(
+                    Component.translatable("gui.authme.method.button.microsoft.selectAccount")
+                        .withStyle(ChatFormatting.GRAY)
+                )
+        ));
+        addRenderableWidget(msButton);
+
+        // Add a button for the 'Mojang (or legacy)' authentication method
+        ImageButton mojangButton = new ImageButton(
+            width / 2 - 34, height / 2 - 5, 20, 20,
+            MOJANG_BUTTON_TEXTURES,
+            ConfirmLinkScreen.confirmLink(this, AuthMe.MOJANG_ACCOUNT_MIGRATION_FAQ_URL),
+            Component.translatable("gui.authme.method.button.mojang")
+        );
+        mojangButton.setTooltip(Tooltip.create(
+            Component.translatable("gui.authme.method.button.mojang")
+                .append("\n")
+                .append(Component.translatable("gui.authme.method.button.mojang.unavailable")
+                    .withStyle(ChatFormatting.GRAY))
+        ));
+        addRenderableWidget(mojangButton);
+
+        // Add a button for the 'Offline' authentication method
+        ImageButton offlineButton = new ImageButton(
+            width / 2 - 10, height / 2 - 5, 20, 20,
+            OFFLINE_BUTTON_TEXTURES,
+            button -> minecraft.setScreenAndShow(new OfflineAuthScreen(this, parentScreen)),
+            Component.translatable("gui.authme.method.button.offline")
+        );
+        offlineButton.setTooltip(Tooltip.create(Component.translatable("gui.authme.method.button.offline")));
+        addRenderableWidget(offlineButton);
+
+        // TODO: Make this not a separate button but somehow embedded in the microsoft auth stuff.
+        ImageButton userSelectionButton = new ImageButton(
+                width / 2 + 14, height / 2 - 5, 20, 20,
+                USER_SELECTION_TEXTURES,
+                button -> minecraft.setScreenAndShow(new UserSelectionScreen(parentScreen))
+        );
+        userSelectionButton.setTooltip(Tooltip.create(Component.translatable("gui.authme.method.button.user_selection")));
+        addRenderableWidget(userSelectionButton);
+
+        // Add a button to log in with a pasted refresh token
+        ImageButton tokenButton = new ImageButton(
+                width / 2 + 38, height / 2 - 5, 20, 20,
+                TOKEN_BUTTON_TEXTURES,
+                button -> minecraft.setScreenAndShow(new AddTokenScreen(parentScreen))
+        );
+        tokenButton.setTooltip(Tooltip.create(Component.translatable("gui.authme.method.button.token")));
+        addRenderableWidget(tokenButton);
+
+        // Add a button to go back
+        addRenderableWidget(
+            Button.builder(Component.translatable("gui.back"), button -> onClose())
+                .bounds(width / 2 - 50, height / 2 + 27, 100, 20)
+                .build()
+        );
+    }
+
+    @Override
+    public void onClose()
+    {
+        if (minecraft != null) minecraft.setScreenAndShow(parentScreen);
+    }
+}
