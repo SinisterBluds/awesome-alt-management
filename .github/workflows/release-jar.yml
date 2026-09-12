@@ -1,0 +1,69 @@
+name: Release
+
+# Builds the Fabric jar and publishes a GitHub release.
+# Trigger by pushing a version tag (v*) or from the Actions tab (workflow_dispatch).
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v3.2.0)"
+        required: true
+        default: "v3.2.0"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+
+      - name: Build Fabric jar
+        run: ./gradlew :fabric:build --no-daemon
+
+      - name: Collect artifact
+        run: |
+          mkdir -p release
+          jar="$(ls fabric/build/libs/awesome-alt-management-fabric-*.jar | grep -vE -- '-(dev|sources|javadoc)\.jar$' | head -n1)"
+          cp "$jar" "release/$(basename "$jar")"
+          sha256sum "release/$(basename "$jar")" | sed 's#release/##' > "release/$(basename "$jar").sha256"
+          ls -la release
+
+      - name: Resolve tag
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Awesome Alt Management ${{ steps.meta.outputs.tag }}
+          body: |
+            In-game Minecraft account switcher for **Minecraft 26.2 (Fabric)**.
+
+            - Paste a Microsoft refresh token to log in (the minting client is auto-detected), or run `/alt <token>`.
+            - Switch between saved accounts in-game without restarting.
+
+            **Requires:** Minecraft 26.2, Fabric Loader, Fabric API. Resourceful Config is bundled.
+            **Install:** drop the jar into your instance's `mods/` folder.
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

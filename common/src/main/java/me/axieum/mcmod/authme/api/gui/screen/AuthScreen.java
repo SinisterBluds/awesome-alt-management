@@ -1,0 +1,76 @@
+package me.axieum.mcmod.authme.api.gui.screen;
+
+import net.minecraft.client.gui.layouts.LayoutElement;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
+
+/**
+ * A screen for handling user authentication.
+ */
+public abstract class AuthScreen extends Screen
+{
+    /** The parent (or last) screen that opened this screen. */
+    protected final Screen parentScreen;
+    /** The screen to be returned to after a successful login. */
+    protected final Screen successScreen;
+    /** True if the login task completed successfully. */
+    protected boolean success = false;
+    /** True if the screen should be closed on success stat (via render thread). */
+    protected boolean closeOnSuccess = false;
+
+    /**
+     * Constructs a new authentication screen.
+     *
+     * @param title         screen title
+     * @param parentScreen  parent (or last) screen that opened this screen
+     * @param successScreen screen to be returned to after a successful login
+     */
+    public AuthScreen(Component title, Screen parentScreen, Screen successScreen)
+    {
+        super(title);
+        this.parentScreen = parentScreen;
+        this.successScreen = successScreen;
+    }
+
+    @Override
+    protected void init()
+    {
+        super.init();
+        assert minecraft != null;
+    }
+
+    @Override
+    public void tick()
+    {
+        super.tick();
+
+        // Optionally close the screen if the login task completed successfully
+        if (success && closeOnSuccess) this.onClose();
+    }
+
+    @Override
+    public void onClose()
+    {
+        if (minecraft == null) return;
+        // A screen opened from a command has no parent/success screen, so fall back to the game
+        final Screen target = success ? successScreen : parentScreen;
+        if (target != null) minecraft.setScreenAndShow(target);
+        else minecraft.setScreenAndShow(null);
+    }
+
+    /**
+     * Centers the position of a LayoutElement.
+     *
+     * @param element the LayoutElement to center.
+     * @param screen the Screen to center the element in.
+     * @param xOffset the horizontal offset to be applied.
+     * @param yOffset the vertical offset to be applied.
+     */
+    protected static void centerPosition(LayoutElement element, Screen screen, int xOffset, int yOffset)
+    {
+        element.setPosition(
+                screen.width / 2 - element.getWidth() / 2 + xOffset,
+                screen.height / 2 - element.getHeight() / 2 - 22 + yOffset
+        );
+    }
+}
